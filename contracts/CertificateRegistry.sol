@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT 
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -77,6 +77,7 @@ contract CertificateRegistry is ICertificateRegistry, AccessControl {
         bytes32 dataHash,
         string calldata metadata
     ) external onlyRole(ISSUER_ROLE) returns (uint256 certificateId) {
+        require(recipient != address(0), "Invalid recipient address");
         require(bytes(cid).length > 0, "CID required");
         require(dataHash != bytes32(0), "Invalid data hash");
 
