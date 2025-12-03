@@ -1,131 +1,226 @@
-#  Academic Certificate Verification System
+# 🎓 Academic Certificate Verification System
 
-A blockchain-based system to **issue, verify, and manage academic certificates** using **Ethereum (Sepolia testnet)** and **IPFS**.  
-This repo contains the **draft smart contract**, its **public interface**, a **deployment script placeholder**, and the plan for a **React + Ethers.js** frontend.
+A fully functional blockchain-based system to **issue, verify, and manage academic certificates** using **Ethereum (Sepolia testnet)** and **IPFS**.
 
----
+## ✨ Features
 
-##  Description
-
-- **Problem:** Traditional certificate verification is slow and vulnerable to tampering.  
-- **Solution:** Store certificate metadata (issuer, recipient, IPFS CID, file hash, status) **on-chain**, and store the PDF itself on **IPFS**.  
-- **Who uses it:**
-  - **Issuers (Universities):** issue, revoke, update certificates  
-  - **Students:** view and share certificates  
-  - **Verifiers (Employers):** independently confirm authenticity  
+- ✅ **Smart Contract**: Fully implemented `CertificateRegistry` contract with Role-Based Access Control (RBAC)
+- ✅ **Backend API**: Node.js/Express server for blockchain interactions
+- ✅ **Frontend UI**: React + Vite application with role-based dashboards
+- ✅ **Blockchain Integration**: Real-time transaction tracking with Etherscan verification
+- ✅ **Certificate Lifecycle**: Issue, revoke, update, and verify certificates on-chain
 
 ---
 
-##  Repository Structure
+## 🏗️ Architecture
+
+```
+┌─────────────────┐
+│   Frontend      │  React + Vite + TailwindCSS
+│   (Port 5173)   │  Three dashboards: Student, Issuer, Verifier
+└────────┬────────┘
+         │ HTTP API
+┌────────▼────────┐
+│   Backend       │  Node.js + Express
+│   (Port 3000)   │  RESTful API for certificate operations
+└────────┬────────┘
+         │ Ethers.js
+┌────────▼────────┐
+│   Blockchain    │  Ethereum Sepolia Testnet
+│   Smart Contract│  CertificateRegistry.sol
+└─────────────────┘
+```
+
+---
+
+## 📁 Repository Structure
 
 ```
 ├── contracts/
-│   └── CertificateRegistry.sol        # Draft contract (placeholder)
-│
-├── interfaces/
-│   └── ICertificateRegistry.sol       # Public interface (events + function signatures)
-│
+│   ├── CertificateRegistry.sol        # Main smart contract implementation
+│   └── interfaces/
+│       └── ICertificateRegistry.sol   # Contract interface
+├── backend/
+│   ├── src/
+│   │   ├── app.js                     # Express server
+│   │   ├── config/
+│   │   │   └── blockchain.js          # Ethers.js configuration
+│   │   ├── controllers/
+│   │   │   └── certificateController.js
+│   │   ├── routes/
+│   │   │   └── certificateRoutes.js
+│   │   └── services/
+│   │       └── certificateService.js  # Blockchain interaction logic
+│   └── package.json
+├── cert-verification-system-frontend/
+│   ├── src/
+│   │   ├── App.jsx                    # Main React component
+│   │   ├── config/
+│   │   │   └── constants.js           # Environment configuration
+│   │   └── services/
+│   │       └── api.js                 # Backend API client
+│   └── package.json
 ├── scripts/
-│   └── deployment.sh                  # Placeholder for deployment automation
-│
+│   ├── deploy.js                      # Hardhat deployment script
+│   └── deployment.sh                  # Deployment automation
+├── hardhat.config.js                  # Hardhat configuration
+├── package.json                       # Hardhat dependencies
 └── README.md
 ```
 
 ---
 
-##  Dependencies / Setup
+## 🚀 Quick Start
 
-You can use **Remix** or a local **Hardhat** environment. Below is the typical Hardhat setup:
+### Prerequisites
 
-- **Node.js** v18+  
-- **Hardhat** (if using local dev)  
-- **MetaMask** on **Sepolia**  
-- (Optional) **Alchemy/Infura** endpoint for Sepolia
+- **Node.js** v18+ (v20.19+ or v22.12+ recommended for Vite compatibility)
+- **npm** or **yarn**
+- **MetaMask** browser extension
+- **Sepolia ETH** (for gas fees) - Get free testnet ETH from [Sepolia Faucet](https://sepoliafaucet.com/)
+- **Sepolia RPC URL** from [Alchemy](https://www.alchemy.com/) or [Infura](https://www.infura.io/)
 
-Example Hardhat init (if you add Hardhat later):
+### Step 1: Clone and Install Dependencies
+
 ```bash
-npm init -y
-npm install --save-dev hardhat
-npx hardhat
+# Clone the repository
+git clone <your-repo-url>
+cd cse540-academic-certificate-verification
+
+# Install Hardhat dependencies (root)
+npm install
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
+
+# Install frontend dependencies
+cd cert-verification-system-frontend
+npm install
+cd ..
 ```
+
+### Step 2: Deploy Smart Contract
+
+1. **Create root `.env` file**:
+```bash
+ETH_PROVIDER_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+PRIVATE_KEY=your_private_key_with_sepolia_eth
+```
+
+2. **Compile the contract**:
+```bash
+npm run compile
+```
+
+3. **Deploy to Sepolia**:
+```bash
+npm run deploy:sepolia
+```
+
+4. **Save the deployed contract address** from the output (you'll need it for backend/frontend config)
+
+### Step 3: Configure Backend
+
+1. **Create `backend/.env` file**:
+```env
+ETH_PROVIDER_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+PRIVATE_KEY=your_private_key_with_sepolia_eth
+CONTRACT_ADDRESS=0x...your_deployed_contract_address...
+CONTRACT_ABI_PATH=../artifacts/contracts/CertificateRegistry.sol/CertificateRegistry.json
+PORT=3000
+```
+
+2. **Start the backend server**:
+```bash
+cd backend
+npm start
+```
+
+The backend will listen on `http://localhost:3000`
+
+### Step 4: Configure Frontend
+
+1. **Create `cert-verification-system-frontend/.env` file**:
+```env
+VITE_API_URL=http://localhost:3000
+VITE_CONTRACT_ADDRESS=0x...your_deployed_contract_address...
+VITE_CHAIN_ID=11155111
+VITE_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+```
+
+2. **Start the frontend**:
+```bash
+cd cert-verification-system-frontend
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+### Step 5: Initialize Contract Roles
+
+Before issuing certificates, you need to add an issuer role:
+
+1. Use the deployed contract address on [Sepolia Etherscan](https://sepolia.etherscan.io/)
+2. Connect with MetaMask (using the admin/deployer wallet)
+3. Call `addIssuer(address)` function with your issuer wallet address
+
+Or, if you have the contract ABI, you can call it programmatically.
 
 ---
 
-## How to Use / Deploy
+## 🎮 Usage
 
-### Option A: Remix (quick)
-1. Open **Remix** → create `ICertificateRegistry.sol` and `CertificateRegistry.sol` files.  
-2. Set compiler to **0.8.19** and enable optimization.  
-3. Deploy to **Sepolia** using MetaMask.  
-4. Copy the **deployed address** for frontend integration.
+### Student Dashboard
+- View all certificates issued to your wallet address
+- See certificate details: course name, grade, issue date, credential hash
+- Check revocation status
 
-### Option B: Hardhat (script-based)
-The repo includes `scripts/deployment.sh` as a placeholder. A typical flow (once a `deploy.js` is added) would be:
-```bash
-npx hardhat compile
-npx hardhat run --network sepolia scripts/deploy.js
-```
-After deployment, share the **contract address** (to be used later in the frontend’s `.env`).
+### Issuer Dashboard
+- Issue new certificates with:
+  - Student name and wallet address
+  - Course name
+  - Grade
+- Revoke certificates
+- View all issued certificates in a table
+- Loading indicators during blockchain transactions
 
-> Incomplete details are acceptable at this stage — this README provides the core steps you’ll flesh out as you implement the deployment script and frontend.
+### Verifier Dashboard
+- Verify certificate authenticity by certificate ID
+- View complete certificate details
+- Check revocation status
+- Verify on-chain data
 
 ---
 
-## Draft Contract/Code
+## 📡 API Endpoints
 
-### `contracts/CertificateRegistry.sol`
+### Backend (Port 3000)
+
+- `POST /api/certificates/issue` - Issue a new certificate
+- `POST /api/certificates/:id/revoke` - Revoke a certificate
+- `GET /api/certificates/:id` - Get certificate by ID
+- `GET /api/certificates/issuer/:address` - Get all certificates by issuer
+- `GET /api/certificates/recipient/:address` - Get all certificates by recipient
+- `GET /api/certificates/:id/exists` - Check if certificate exists
+
+---
+
+## 🔐 Smart Contract
+
+### `CertificateRegistry.sol`
+
+**Implemented Features:**
+- ✅ Issue certificates with IPFS CID and data hash
+- ✅ Revoke certificates
+- ✅ Update certificate metadata
+- ✅ Role-based access control (Admin, Issuer)
+- ✅ Query certificates by issuer, recipient, or ID
+- ✅ Event emissions for all operations
+
+**Key Functions:**
 ```solidity
-// SPDX-License-Identifier: MIT 
-pragma solidity ^0.8.19;
-
-// Placeholder for CertificateRegistry contract implementation
-```
-**High-level intent:**  
-This contract will implement the certificate lifecycle using the interface below:
-- **Issue** a certificate (issuer-only)
-- **Revoke** a certificate (issuer-only / admin)
-- **Update** certificate CID/hash on re-issue
-- **Query** certificates by issuer/recipient/ID
-- **Role-based access** (admin, issuer)
-
-### `interfaces/ICertificateRegistry.sol` (Signatures & Events)
-Public interface exposing the main events & functions the frontend will call.  
-Below are the **actual signatures present** in this repo’s interface (draft):
-
-#### Events
-```solidity
-event CertificateIssued(
-    uint256 indexed certificateId,
-    address indexed issuer,
-    address indexed recipient,
-    string cid,
-    bytes32 dataHash
-);
-
-event CertificateRevoked(
-    uint256 indexed certificateId,
-    address indexed issuer,
-    uint256 revokedAt
-);
-
-event CertificateUpdated(
-    uint256 indexed certificateId,
-    address indexed issuer,
-    string newCid,
-    bytes32 newDataHash
-);
-
-event IssuerAdded(address indexed account);
-event IssuerRemoved(address indexed account);
-```
-
-#### Functions
-```solidity
-function addIssuer(address _issuerAddress) external;
-function removeIssuer(address _issuerAddress) external;
-function isIssuer(address _issuerAddress) external view returns (bool);
-function isAdmin(address _adminAddress) external view returns (bool);
-
 function issueCertificate(
     address recipient,
     string calldata cid,
@@ -135,65 +230,136 @@ function issueCertificate(
 
 function revokeCertificate(uint256 certificateId) external;
 
+function getCertificate(uint256 certificateId)
+    external view returns (Certificate memory);
+
 function certificatesOfIssuer(address issuer)
-    external
-    view
-    returns (uint256[] memory);
+    external view returns (uint256[] memory);
 
 function certificatesOfRecipient(address recipient)
-    external
-    view
-    returns (uint256[] memory);
-
-function totalCertificates() external view returns (uint256);
-function exists(uint256 certificateId) external view returns (bool);
+    external view returns (uint256[] memory);
 ```
 
-**High-level component comments (what each does):**
-- **Role management (`addIssuer`, `removeIssuer`, `isIssuer`, `isAdmin`):**  
-  Admin-controlled list of authorized issuers who can create/revoke certificates.
-- **Issuance (`issueCertificate`)**:  
-  Creates an immutable record linking `issuer → recipient → IPFS CID` and **SHA-256** file hash for tamper detection; emits `CertificateIssued`.
-- **Revocation (`revokeCertificate`)**:  
-  Marks a certificate as revoked; emits `CertificateRevoked`.
-- **Update (planned, `updateCertificate`)**:  
-  Allows issuer to update the stored `CID`/`hash` upon re-issuing; emits `CertificateUpdated`.
-- **Queries (`certificatesOfIssuer`, `certificatesOfRecipient`, `totalCertificates`, `exists`)**:  
-  Read functions to support UI dashboards and public verification.
+**Events:**
+- `CertificateIssued(uint256 indexed certificateId, address indexed issuer, address indexed recipient, string cid, bytes32 dataHash)`
+- `CertificateRevoked(uint256 indexed certificateId, address indexed issuer, uint256 revokedAt)`
+- `CertificateUpdated(uint256 indexed certificateId, address indexed issuer, string newCid, bytes32 newDataHash)`
 
 ---
 
-## Frontend Plan
+## 🔍 Verifying Blockchain Activity
 
-Planned stack:
-- **React + Vite**, **Ethers.js v6**, **Pinata SDK** (IPFS), **TailwindCSS + DaisyUI**
-- **Portals:** Issuer (issue/revoke/update), Student (my certificates), Verifier (public verify by ID)
-- **Flow:**
-  1) Upload PDF → IPFS (get CID)  
-  2) SHA-256 hash locally  
-  3) Call contract (`issueCertificate`)  
-  4) Verifier fetches CID + hash on-chain, downloads file, re-computes hash, and checks revocation status
+### Transaction Verification
 
----
+1. **Backend Logs**: When you issue or revoke a certificate, the backend logs will show:
+   - Transaction hash
+   - Block number
+   - Gas used
+   - Etherscan link
 
-## Design & Security
+2. **Etherscan**: Visit the transaction hash link (e.g., `https://sepolia.etherscan.io/tx/0x...`) to see:
+   - Transaction status (Success/Failed)
+   - Gas fees paid
+   - Contract interaction details
+   - Events emitted
 
-- **Integrity:** Hash comparison (on-chain vs locally computed)  
-- **Decentralization:** Ethereum (Sepolia) + IPFS  
-- **RBAC:** Admin/Issuer separation for controlled issuance  
-- **Auditability:** Events (`Issued`, `Revoked`, `Updated`) act as an on-chain audit log
+3. **MetaMask**: Check your wallet's transaction history to see Sepolia ETH deductions for gas fees
 
 ---
 
-## Future work
+## 🛠️ Development
 
-- Implement `CertificateRegistry.sol` per the interface  
-- Add Hardhat config + `deploy.js` and wire `deployment.sh`  
-- Push `frontend/` (React + Ethers.js) and integrate contract ABI/address  
-- Optional: DID/VCs, NFT representation, multi-chain (Polygon/Base)
+### Compile Contracts
+```bash
+npm run compile
+```
+
+### Run Tests (if available)
+```bash
+npx hardhat test
+```
+
+### Deploy to Local Network
+```bash
+npx hardhat node
+npm run deploy:local
+```
 
 ---
 
-## License
+## 📦 Technology Stack
+
+- **Smart Contracts**: Solidity ^0.8.20, OpenZeppelin Contracts
+- **Blockchain**: Ethereum Sepolia Testnet
+- **Development**: Hardhat
+- **Backend**: Node.js, Express, Ethers.js v6
+- **Frontend**: React, Vite, TailwindCSS, Axios
+- **Crypto**: SHA-256 hashing for certificate integrity
+
+---
+
+## 🔒 Security Features
+
+- **Integrity**: SHA-256 hash verification of certificate data
+- **Decentralization**: Immutable records on Ethereum blockchain
+- **RBAC**: Admin/Issuer role separation
+- **Auditability**: All operations emit events for on-chain audit trail
+- **Tamper-proof**: Certificate data stored as immutable on-chain records
+
+---
+
+## 📝 Environment Variables
+
+### Root `.env` (for Hardhat deployment)
+```
+ETH_PROVIDER_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+PRIVATE_KEY=your_private_key_here
+```
+
+### `backend/.env`
+```
+ETH_PROVIDER_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+PRIVATE_KEY=your_private_key_here
+CONTRACT_ADDRESS=0x...
+CONTRACT_ABI_PATH=../artifacts/contracts/CertificateRegistry.sol/CertificateRegistry.json
+PORT=3000
+```
+
+### `cert-verification-system-frontend/.env`
+```
+VITE_API_URL=http://localhost:3000
+VITE_CONTRACT_ADDRESS=0x...
+VITE_CHAIN_ID=11155111
+VITE_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+```
+
+---
+
+## 🚧 Future Enhancements
+
+- IPFS integration for PDF certificate storage
+- Email notifications for certificate issuance
+- QR code generation for quick verification
+- Multi-chain support (Polygon, Base)
+- NFT representation of certificates
+- Decentralized Identity (DID) integration
+- Bulk certificate upload
+- Advanced search and filtering
+
+---
+
+## 📄 License
 
 MIT — free to use and modify with attribution.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+## 📞 Support
+
+For issues or questions, please open an issue on the repository.
