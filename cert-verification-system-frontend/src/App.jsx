@@ -1,49 +1,12 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { Camera, Shield, CheckCircle, XCircle, Share2, FileText, Award, Search, ExternalLink, Sparkles, Users, Lock, Zap } from 'lucide-react';
+import { Camera, Shield, CheckCircle, XCircle, Share2, FileText, Award, Search, ExternalLink, Sparkles, Users, Lock, Zap, Loader2, ExternalLinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CryptoJS from 'crypto-js';
+import certificateAPI from './services/api.js';
 
-// Mock Data
-const MOCK_CERTIFICATES = [
-  {
-    id: '1',
-    studentName: 'Alice Johnson',
-    studentAddress: '0x2222222222222222222222222222222222222222',
-    courseName: 'Bachelor of Computer Science',
-    issuer: 'MIT',
-    issuerAddress: '0x1111111111111111111111111111111111111111',
-    issueDate: '2024-05-15',
-    grade: 'First Class Honours',
-    credentialHash: '0xabc123...',
-    isRevoked: false,
-    thumbnail: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=400&h=300&fit=crop'
-  },
-  {
-    id: '2',
-    studentName: 'Bob Smith',
-    studentAddress: '0x3333333333333333333333333333333333333333',
-    courseName: 'Master of Business Administration',
-    issuer: 'Stanford University',
-    issuerAddress: '0x1111111111111111111111111111111111111111',
-    issueDate: '2024-06-20',
-    grade: 'Distinction',
-    credentialHash: '0xdef456...',
-    isRevoked: false,
-    thumbnail: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=400&h=300&fit=crop'
-  },
-  {
-    id: '3',
-    studentName: 'Carol Davis',
-    studentAddress: '0x2222222222222222222222222222222222222222',
-    courseName: 'PhD in Artificial Intelligence',
-    issuer: 'MIT',
-    issuerAddress: '0x1111111111111111111111111111111111111111',
-    issueDate: '2023-12-10',
-    grade: 'Pass',
-    credentialHash: '0xghi789...',
-    isRevoked: true,
-    thumbnail: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&h=300&fit=crop'
-  }
-];
+// Certificate image URL
+const CERTIFICATE_IMAGE_URL =
+  'https://static.vecteezy.com/system/resources/previews/065/977/934/non_2x/a-certificate-icon-with-a-red-ribbon-and-a-paper-document-free-png.png';
 
 // Context
 const AppContext = createContext();
@@ -55,6 +18,10 @@ const useApp = () => {
 };
 
 // Router Implementation
+const RouterContext = createContext();
+
+const useRouter = () => useContext(RouterContext);
+
 const Router = ({ children }) => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -75,10 +42,6 @@ const Router = ({ children }) => {
     </RouterContext.Provider>
   );
 };
-
-const RouterContext = createContext();
-
-const useRouter = () => useContext(RouterContext);
 
 const Route = ({ path, element }) => {
   const { currentPath } = useRouter();
@@ -299,6 +262,10 @@ const IssuerDashboard = () => {
   const { certificates, issueCertificate, revokeCertificate } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isIssuing, setIsIssuing] = useState(false);
+  const [revokingIds, setRevokingIds] = useState(new Set());
+  const [lastTxHash, setLastTxHash] = useState(null);
+  const [lastTxType, setLastTxType] = useState(null);
   const [formData, setFormData] = useState({
     studentName: '',
     studentAddress: '',
@@ -306,12 +273,65 @@ const IssuerDashboard = () => {
     grade: ''
   });
 
-  const handleIssue = () => {
-    issueCertificate(formData);
-    setShowModal(false);
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
-    setFormData({ studentName: '', studentAddress: '', courseName: '', grade: '' });
+  const handleIssue = async () => {
+    // Validate student address format BEFORE submitting
+    if (!formData.studentAddress || formData.studentAddress.length !== 42) {
+      alert(`❌ Invalid Student Address Format!\n\nEthereum addresses must be exactly 42 characters (0x + 40 hex characters).\n\nYou entered: "${formData.studentAddress || '(empty)'}" (${formData.studentAddress?.length || 0} characters)\n\nPlease use a valid address like:\n0x1234567890123456789012345678901234567890\n\nOr revert to:\n0x2222222222222222222222222222222222222222`);
+      return;
+    }
+    
+    // Validate other required fields
+    if (!formData.studentName || !formData.courseName || !formData.grade) {
+      alert('Please fill in all required fields: Student Name, Course Name, and Grade.');
+      return;
+    }
+    
+    setIsIssuing(true);
+    try {
+      await issueCertificate(formData);
+      setShowModal(false);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2000);
+      setFormData({ studentName: '', studentAddress: '', courseName: '', grade: '' });
+    } catch (error) {
+      console.error('Failed to issue certificate:', error);
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to issue certificate. Please try again.';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      // Check for invalid address format
+      if (formData.studentAddress && formData.studentAddress.length < 42) {
+        errorMessage = `Invalid student address format! Ethereum addresses must be exactly 42 characters (0x + 40 hex characters).\n\nYou entered: "${formData.studentAddress}" (${formData.studentAddress.length} characters)\n\nPlease use a valid address like:\n0x1234567890123456789012345678901234567890\n\nOr revert to:\n0x2222222222222222222222222222222222222222`;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsIssuing(false);
+    }
+  };
+
+  const handleRevoke = async (certId) => {
+    setRevokingIds((prev) => new Set([...prev, certId]));
+    try {
+      await revokeCertificate(certId);
+    } catch (error) {
+      console.error('Failed to revoke certificate:', error);
+      alert('Failed to revoke certificate. Please try again.');
+    } finally {
+      setRevokingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(certId);
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -375,10 +395,18 @@ const IssuerDashboard = () => {
                   <td className="px-6 py-4">
                     {!cert.isRevoked && (
                       <button
-                        onClick={() => revokeCertificate(cert.id)}
-                        className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                        onClick={() => handleRevoke(cert.id)}
+                        disabled={revokingIds.has(cert.id)}
+                        className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        Revoke
+                        {revokingIds.has(cert.id) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Revoking...
+                          </>
+                        ) : (
+                          'Revoke'
+                        )}
                       </button>
                     )}
                   </td>
@@ -444,9 +472,17 @@ const IssuerDashboard = () => {
                   </button>
                   <button
                     onClick={handleIssue}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                    disabled={isIssuing}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Issue
+                    {isIssuing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Issuing...
+                      </>
+                    ) : (
+                      'Issue'
+                    )}
                   </button>
                 </div>
               </div>
@@ -460,8 +496,101 @@ const IssuerDashboard = () => {
 
 // Dashboard - Student View
 const StudentDashboard = () => {
-  const { certificates, walletAddress } = useApp();
-  const studentCerts = certificates.filter(c => c.studentAddress.toLowerCase() === walletAddress.toLowerCase());
+  const { walletAddress, certificates: inMemoryCerts } = useApp();
+  const [studentCerts, setStudentCerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStudentCertificates = async () => {
+      if (!walletAddress) {
+        setStudentCerts([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // First, get in-memory certificates for this student (recently issued in this session)
+        const inMemoryStudentCerts = inMemoryCerts.filter(
+          c => c.studentAddress && c.studentAddress.toLowerCase() === walletAddress.toLowerCase()
+        );
+        
+        // Fetch certificate IDs for this recipient from blockchain
+        let blockchainCerts = [];
+        try {
+          const certificateIds = await certificateAPI.getByRecipient(walletAddress);
+          
+          if (certificateIds && certificateIds.length > 0) {
+            // Fetch full details for each certificate
+            const certsPromises = certificateIds.map(async (id) => {
+              try {
+                const certData = await certificateAPI.getById(id.toString());
+                
+                // Parse metadata JSON if it exists
+                let metadata = {};
+                try {
+                  metadata = certData.metadata ? JSON.parse(certData.metadata) : {};
+                } catch (e) {
+                  console.warn('Failed to parse metadata:', e);
+                }
+
+                // Convert issuedAt timestamp to date string
+                const issuedDate = certData.issuedAt 
+                  ? new Date(Number(certData.issuedAt) * 1000).toISOString().split('T')[0]
+                  : new Date().toISOString().split('T')[0];
+
+                return {
+                  id: certData.id,
+                  studentName: metadata.studentName || 'Unknown Student',
+                  studentAddress: certData.recipient,
+                  courseName: metadata.courseName || 'Unknown Course',
+                  issuer: metadata.issuer || 'Unknown Issuer',
+                  issuerAddress: certData.issuer,
+                  issueDate: issuedDate,
+                  grade: metadata.grade || 'N/A',
+                  credentialHash: certData.dataHash,
+                  isRevoked: certData.revoked,
+                  thumbnail: CERTIFICATE_IMAGE_URL,
+                };
+              } catch (err) {
+                console.error(`Failed to load certificate ${id}:`, err);
+                return null;
+              }
+            });
+
+            blockchainCerts = (await Promise.all(certsPromises)).filter(c => c !== null);
+          }
+        } catch (err) {
+          console.error('Failed to load certificates from blockchain:', err);
+        }
+
+        // Merge in-memory and blockchain certificates, removing duplicates by ID
+        const allCerts = [...inMemoryStudentCerts];
+        blockchainCerts.forEach(bcCert => {
+          if (!allCerts.find(c => c.id === bcCert.id)) {
+            allCerts.push(bcCert);
+          }
+        });
+
+        // Sort by ID (newest first)
+        allCerts.sort((a, b) => Number(b.id) - Number(a.id));
+        
+        setStudentCerts(allCerts);
+      } catch (err) {
+        console.error('Failed to load student certificates:', err);
+        // Fallback to in-memory certificates
+        const inMemoryStudentCerts = inMemoryCerts.filter(
+          c => c.studentAddress && c.studentAddress.toLowerCase() === walletAddress.toLowerCase()
+        );
+        setStudentCerts(inMemoryStudentCerts);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStudentCertificates();
+  }, [walletAddress, inMemoryCerts]);
 
   const copyLink = (id) => {
     const link = `${window.location.origin}/verify/${id}`;
@@ -475,7 +604,16 @@ const StudentDashboard = () => {
         <p className="text-gray-400">View and share your academic credentials</p>
       </div>
 
-      {studentCerts.length === 0 ? (
+      {loading ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-20 bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10"
+        >
+          <Award className="w-16 h-16 text-gray-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-400 text-lg">Loading certificates...</p>
+        </motion.div>
+      ) : studentCerts.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -495,11 +633,15 @@ const StudentDashboard = () => {
               whileHover={{ y: -8 }}
               className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden group"
             >
-              <div className="relative h-48 overflow-hidden">
+              <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-500/10 to-pink-500/10">
                 <img 
-                  src={cert.thumbnail} 
+                  src={CERTIFICATE_IMAGE_URL} 
                   alt={cert.courseName}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-contain object-center bg-white/5 p-4 group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.classList.add('bg-gradient-to-br', 'from-purple-500/20', 'to-pink-500/20');
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute top-4 right-4">
@@ -645,11 +787,13 @@ const DashboardPage = () => {
                 <span className="text-gray-400 text-sm">Role: </span>
                 <span className="text-white font-semibold capitalize">{role}</span>
               </div>
-              <div className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
-                <span className="text-white font-mono text-sm">
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                </span>
-              </div>
+              {walletAddress && (
+                <div className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
+                  <span className="text-white font-mono text-sm">
+                    {walletAddress.length <= 15 ? walletAddress : `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`}
+                  </span>
+                </div>
+              )}
               <button
                 onClick={disconnectWallet}
                 className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
@@ -742,11 +886,15 @@ const VerifyPage = ({ id }) => {
 
           {/* Certificate Preview */}
           <div className="p-8">
-            <div className="relative h-64 rounded-2xl overflow-hidden mb-8">
+            <div className="relative h-64 rounded-2xl overflow-hidden mb-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10">
               <img 
-                src={certificate.thumbnail} 
+                src={CERTIFICATE_IMAGE_URL} 
                 alt={certificate.courseName}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain object-center bg-white/5 p-6"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.classList.add('bg-gradient-to-br', 'from-purple-500/30', 'to-pink-500/30');
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
               <div className="absolute bottom-6 left-6 right-6">
@@ -866,7 +1014,7 @@ const NotFoundPage = () => {
 // App Provider
 const AppProvider = ({ children }) => {
   const [walletAddress, setWalletAddress] = useState(null);
-  const [certificates, setCertificates] = useState(MOCK_CERTIFICATES);
+  const [certificates, setCertificates] = useState([]);
 
   const connectWallet = (address = null) => {
     // Mock wallet connection - use provided address or cycle through roles
@@ -896,27 +1044,98 @@ const AppProvider = ({ children }) => {
     return 'verifier';
   };
 
-  const issueCertificate = (formData) => {
+  const issueCertificate = async (formData) => {
+    // Prepare metadata to store on-chain (as a JSON string)
+    const issueDate = new Date().toISOString().split('T')[0];
+    const metadata = JSON.stringify({
+      studentName: formData.studentName,
+      studentAddress: formData.studentAddress,
+      courseName: formData.courseName,
+      grade: formData.grade,
+      issuer: 'MIT',
+      issuerAddress: walletAddress,
+      issueDate,
+    });
+
+    // For demo purposes, we use a placeholder CID and hash the metadata
+    const cid = 'ipfs://placeholder-cid';
+    const hash = CryptoJS.SHA256(metadata).toString();
+    const dataHash = `0x${hash}`;
+
+    let certificateId = String(certificates.length + 1);
+    let txHash = null; // Initialize txHash outside try block
+    let apiResult = null; // Store API result
+
+    try {
+      apiResult = await certificateAPI.issue({
+        recipient: formData.studentAddress,
+        cid,
+        dataHash,
+        metadata,
+      });
+
+      if (apiResult && apiResult.certificateId) {
+        certificateId = String(apiResult.certificateId);
+      }
+      
+      // Store transaction hash
+      if (apiResult && apiResult.txHash) {
+        txHash = apiResult.txHash;
+        console.log('✅ Certificate issued on blockchain!');
+        console.log('Transaction Hash:', apiResult.txHash);
+        console.log('View on Etherscan:', `https://sepolia.etherscan.io/tx/${apiResult.txHash}`);
+      }
+    } catch (err) {
+      // Log the error and throw it so handleIssue can catch it
+      console.error('Failed to issue certificate on-chain/backend:', err);
+      console.error('Error details:', err.response?.data || err.message);
+      
+      // Check for common errors
+      if (formData.studentAddress && formData.studentAddress.length !== 42) {
+        throw new Error(`Invalid student address format. Ethereum addresses must be 42 characters (0x + 40 hex). You provided: "${formData.studentAddress}" (${formData.studentAddress.length} characters). Please use a valid address like: 0x1234567890123456789012345678901234567890`);
+      }
+      
+      throw err; // Re-throw the error so handleIssue can catch it
+    }
+
+    // Only create certificate if we got here without errors
     const newCert = {
-      id: String(certificates.length + 1),
+      id: certificateId,
       studentName: formData.studentName,
       studentAddress: formData.studentAddress,
       courseName: formData.courseName,
       issuer: 'MIT',
       issuerAddress: walletAddress,
-      issueDate: new Date().toISOString().split('T')[0],
+      issueDate,
       grade: formData.grade,
-      credentialHash: '0x' + Math.random().toString(36).substring(2, 15),
+      credentialHash: dataHash,
       isRevoked: false,
-      thumbnail: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=300&fit=crop'
+      thumbnail: CERTIFICATE_IMAGE_URL,
+      txHash: txHash, // Use variable defined in scope
     };
-    setCertificates([...certificates, newCert]);
+
+    setCertificates((prev) => [...prev, newCert]);
   };
 
-  const revokeCertificate = (id) => {
-    setCertificates(certificates.map(cert => 
-      cert.id === id ? { ...cert, isRevoked: true } : cert
-    ));
+  const revokeCertificate = async (id) => {
+    try {
+      const result = await certificateAPI.revoke(id);
+      
+      // Log transaction hash for blockchain verification
+      if (result && result.txHash) {
+        console.log('✅ Certificate revoked on blockchain!');
+        console.log('Transaction Hash:', result.txHash);
+        console.log('View on Etherscan:', `https://sepolia.etherscan.io/tx/${result.txHash}`);
+      }
+    } catch (err) {
+      console.error('Failed to revoke certificate on-chain/backend:', err);
+    }
+
+    setCertificates((prev) =>
+      prev.map((cert) =>
+        cert.id === id ? { ...cert, isRevoked: true } : cert
+      )
+    );
   };
 
   const getCertificate = (id) => {

@@ -8,5 +8,6 @@ router.post('/revoke', controller.revokeCertificate);
 router.get('/issuer/:issuer', controller.getCertificatesByIssuer);
 router.get('/recipient/:recipient', controller.getCertificatesByRecipient);
 router.get('/exists/:id', controller.exists);
+router.get('/:id', controller.getCertificate);
 
 module.exports = router;
