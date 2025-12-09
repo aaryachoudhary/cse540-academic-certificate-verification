@@ -47,7 +47,15 @@ async function issueCertificate({ recipient, cid, dataHash, metadata }) {
       certificateId = null;
     }
 
-    return { txHash: tx.hash, receipt, certificateId };
+    // Serialize receipt to avoid BigInt serialization issues (frontend doesn't use receipt, but serialize for safety)
+    const serializedReceipt = {
+      blockNumber: receipt.blockNumber.toString(),
+      gasUsed: receipt.gasUsed.toString(),
+      gasPrice: receipt.gasPrice ? receipt.gasPrice.toString() : null,
+      status: receipt.status,
+    };
+    
+    return { txHash: tx.hash, receipt: serializedReceipt, certificateId };
   } catch (error) {
     console.error('\n❌ ERROR issuing certificate on blockchain:');
     console.error('   Error Type:', error.constructor.name);
@@ -90,17 +98,49 @@ async function revokeCertificate(certificateId) {
   console.log('   🔗 View on Etherscan: https://sepolia.etherscan.io/tx/' + tx.hash);
   console.log('');
   
-  return { txHash: tx.hash, receipt };
+  // Serialize receipt to avoid BigInt serialization issues (frontend doesn't use receipt, but serialize for safety)
+  const serializedReceipt = {
+    blockNumber: receipt.blockNumber.toString(),
+    gasUsed: receipt.gasUsed.toString(),
+    gasPrice: receipt.gasPrice ? receipt.gasPrice.toString() : null,
+    status: receipt.status,
+  };
+  
+  return { txHash: tx.hash, receipt: serializedReceipt };
 }
 
 async function certificatesOfIssuer(issuer) {
   const contract = getContract();
-  return await contract.certificatesOfIssuer(issuer);
+  const certificateIds = await contract.certificatesOfIssuer(issuer);
+  // Convert BigInt array to string array for JSON serialization
+  // Handle empty arrays and ensure all values are converted
+  if (!Array.isArray(certificateIds)) {
+    return [];
+  }
+  return certificateIds.map(id => {
+    // Handle both BigInt and string types
+    if (typeof id === 'bigint') {
+      return id.toString();
+    }
+    return String(id);
+  });
 }
 
 async function certificatesOfRecipient(recipient) {
   const contract = getContract();
-  return await contract.certificatesOfRecipient(recipient);
+  const certificateIds = await contract.certificatesOfRecipient(recipient);
+  // Convert BigInt array to string array for JSON serialization
+  // Handle empty arrays and ensure all values are converted
+  if (!Array.isArray(certificateIds)) {
+    return [];
+  }
+  return certificateIds.map(id => {
+    // Handle both BigInt and string types
+    if (typeof id === 'bigint') {
+      return id.toString();
+    }
+    return String(id);
+  });
 }
 
 async function exists(certificateId) {
